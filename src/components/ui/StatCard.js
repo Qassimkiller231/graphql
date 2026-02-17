@@ -3,7 +3,6 @@ import { useEffect, useState, useRef } from "react";
 import { motion, useMotionValue, useTransform } from "framer-motion";
 
 // ─── CountUp Animation ──────────────────────────────────────
-// Animates a number from 0 to target using requestAnimationFrame
 function useCountUp(target, duration = 2000, decimals = 0) {
     const [value, setValue] = useState(0);
     const startTime = useRef(null);
@@ -14,8 +13,6 @@ function useCountUp(target, duration = 2000, decimals = 0) {
         const animate = (timestamp) => {
             if (!startTime.current) startTime.current = timestamp;
             const progress = Math.min((timestamp - startTime.current) / duration, 1);
-
-            // Ease-out cubic: fast start, smooth landing
             const eased = 1 - Math.pow(1 - progress, 3);
             setValue(eased * target);
 
@@ -32,13 +29,6 @@ function useCountUp(target, duration = 2000, decimals = 0) {
 }
 
 // ─── StatCard Component ─────────────────────────────────────
-// Props:
-//   label    - "Total XP"
-//   value    - the raw number
-//   format   - function to format the display (e.g., formatXP)
-//   color    - accent color hex (e.g., "#a855f7")
-//   delay    - stagger delay for entrance animation
-//   icon     - emoji or icon string
 export default function StatCard({ label, value, format, color, delay = 0, icon }) {
     const animated = useCountUp(value, 2200, format ? 0 : 0);
     const displayValue = format ? format(animated) : animated.toLocaleString();
@@ -47,8 +37,8 @@ export default function StatCard({ label, value, format, color, delay = 0, icon 
     const cardRef = useRef(null);
     const mouseX = useMotionValue(0);
     const mouseY = useMotionValue(0);
-    const rotateX = useTransform(mouseY, [-0.5, 0.5], [6, -6]);
-    const rotateY = useTransform(mouseX, [-0.5, 0.5], [-6, 6]);
+    const rotateX = useTransform(mouseY, [-0.5, 0.5], [8, -8]);
+    const rotateY = useTransform(mouseX, [-0.5, 0.5], [-8, 8]);
 
     const handleMouse = (e) => {
         const rect = cardRef.current.getBoundingClientRect();
@@ -61,7 +51,6 @@ export default function StatCard({ label, value, format, color, delay = 0, icon 
         mouseY.set(0);
     };
 
-    // Set CSS custom properties for card color theming
     const cardStyle = {
         "--card-color": color,
         "--card-color-faint": `${color}18`,
@@ -77,9 +66,15 @@ export default function StatCard({ label, value, format, color, delay = 0, icon 
                 rotateX,
                 rotateY,
                 transformStyle: "preserve-3d",
+                position: "relative",
+                overflow: "hidden",
             }}
             initial={{ opacity: 0, y: 30, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
+            whileHover={{
+                scale: 1.04,
+                boxShadow: `0 0 30px ${color}30, 0 8px 32px rgba(0,0,0,0.3)`,
+            }}
             transition={{
                 duration: 0.6,
                 delay: delay,
@@ -88,15 +83,55 @@ export default function StatCard({ label, value, format, color, delay = 0, icon 
             onMouseMove={handleMouse}
             onMouseLeave={handleMouseLeave}
         >
-            {/* Icon */}
+            {/* Ambient glow orb — floats around behind content */}
+            <motion.div
+                style={{
+                    position: "absolute",
+                    width: "80px",
+                    height: "80px",
+                    borderRadius: "50%",
+                    background: `radial-gradient(circle, ${color}25 0%, transparent 70%)`,
+                    filter: "blur(20px)",
+                    pointerEvents: "none",
+                    zIndex: 0,
+                }}
+                animate={{
+                    x: ["-20%", "60%", "20%", "-20%"],
+                    y: ["-10%", "30%", "70%", "-10%"],
+                }}
+                transition={{
+                    duration: 8,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                }}
+            />
+
+            {/* Icon with float + pulse */}
             {icon && (
-                <div style={{
-                    fontSize: "32px",
-                    marginBottom: "12px",
-                    filter: `drop-shadow(0 0 8px ${color}60)`,
-                }}>
+                <motion.div
+                    style={{
+                        fontSize: "32px",
+                        marginBottom: "12px",
+                        filter: `drop-shadow(0 0 10px ${color}60)`,
+                        position: "relative",
+                        zIndex: 1,
+                    }}
+                    animate={{
+                        y: [0, -4, 0],
+                        filter: [
+                            `drop-shadow(0 0 8px ${color}40)`,
+                            `drop-shadow(0 0 16px ${color}70)`,
+                            `drop-shadow(0 0 8px ${color}40)`,
+                        ],
+                    }}
+                    transition={{
+                        duration: 3,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                    }}
+                >
                     {icon}
-                </div>
+                </motion.div>
             )}
 
             {/* Label */}
@@ -107,20 +142,37 @@ export default function StatCard({ label, value, format, color, delay = 0, icon 
                 textTransform: "uppercase",
                 letterSpacing: "1.5px",
                 marginBottom: "10px",
+                position: "relative",
+                zIndex: 1,
             }}>
                 {label}
             </p>
 
-            {/* Animated Value */}
-            <p style={{
-                fontSize: "32px",
-                fontWeight: "700",
-                color: color,
-                textShadow: `0 0 20px ${color}40`,
-                lineHeight: 1.1,
-            }}>
+            {/* Animated Value with subtle pulse */}
+            <motion.p
+                style={{
+                    fontSize: "32px",
+                    fontWeight: "700",
+                    color: color,
+                    lineHeight: 1.1,
+                    position: "relative",
+                    zIndex: 1,
+                }}
+                animate={{
+                    textShadow: [
+                        `0 0 20px ${color}30`,
+                        `0 0 30px ${color}60`,
+                        `0 0 20px ${color}30`,
+                    ],
+                }}
+                transition={{
+                    duration: 4,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                }}
+            >
                 {displayValue}
-            </p>
+            </motion.p>
         </motion.div>
     );
 }

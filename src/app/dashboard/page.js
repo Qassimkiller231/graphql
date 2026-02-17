@@ -363,7 +363,7 @@ export default function Dashboard() {
                         color="#22c55e"
                         icon={
                             <LottieIcon
-                                url="https://fonts.gstatic.com/s/e/notoemoji/latest/1f3af/lottie.json"
+                                url="/animations/pass-rate.json"
                                 fallback="🎯"
                                 size={36}
                             />
