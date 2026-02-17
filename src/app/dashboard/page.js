@@ -14,21 +14,21 @@ import { formatXP } from "@/lib/utils";
 // ─── GraphQL Query ──────────────────────────────────────────
 // Fetches all dashboard data in a single request:
 // - User profile, XP aggregate, XP transactions, skills,
-// - Pass/fail grades, XP by project, piscine results
+// - Pass/fail grades, XP by project (module only, no piscine)
 const DASHBOARD_QUERY = `{
     user {
         id
         login
         auditRatio
     }
-    transaction_aggregate(where: { type: { _eq: "xp" } }) {
+    transaction_aggregate(where: { type: { _eq: "xp" }, path: { _nlike: "%piscine%" } }) {
         aggregate {
             sum { amount }
             count
         }
     }
     transaction(
-        where: { type: { _eq: "xp" } }
+        where: { type: { _eq: "xp" }, path: { _nlike: "%piscine%" } }
         order_by: { createdAt: asc }
     ) {
         amount
@@ -36,17 +36,17 @@ const DASHBOARD_QUERY = `{
         path
     }
     skills: transaction(
-        where: { type: { _like: "skill_%" } }
+        where: { type: { _like: "skill_%" }, path: { _nlike: "%piscine%" } }
         order_by: [{ type: asc }, { amount: desc }]
         distinct_on: type
     ) {
         type
         amount
     }
-    pass: result_aggregate(where: { grade: { _gte: 1 } }) {
+    pass: result_aggregate(where: { grade: { _gte: 1 }, path: { _nlike: "%piscine%" } }) {
         aggregate { count }
     }
-    fail: result_aggregate(where: { grade: { _lt: 1 } }) {
+    fail: result_aggregate(where: { grade: { _lt: 1 }, path: { _nlike: "%piscine%" } }) {
         aggregate { count }
     }
     xp_by_project: transaction(
@@ -54,13 +54,6 @@ const DASHBOARD_QUERY = `{
         order_by: { amount: desc }
     ) {
         amount
-        path
-    }
-    piscine_results: result(
-        where: { path: { _like: "%piscine-js%" } }
-        order_by: { createdAt: asc }
-    ) {
-        grade
         path
     }
 }`;
@@ -96,20 +89,7 @@ function buildXPByProject(transactions) {
     }));
 }
 
-// ─── Piscine Stats Processing ───────────────────────────────
-// Counts pass/fail and attempts per exercise
-function buildPiscineStats(results) {
-    let pass = 0, fail = 0;
-    const attempts = {};
 
-    results.forEach((r) => {
-        r.grade >= 1 ? pass++ : fail++;
-        const exercise = r.path.split("/").pop();
-        attempts[exercise] = (attempts[exercise] || 0) + 1;
-    });
-
-    return { pass, fail, attempts };
-}
 
 // ─── Chart Configuration: XP Progress ───────────────────────
 function getXPChartOptions() {
@@ -216,43 +196,7 @@ function getProjectChartOptions(projectNames) {
     };
 }
 
-// ─── Chart Configuration: Piscine Pass/Fail ─────────────────
-function getPiscineDonutOptions() {
-    return {
-        chart: {
-            type: "donut",
-            background: "transparent",
-            animations: { enabled: true, speed: 1500 },
-        },
-        theme: { mode: "dark" },
-        colors: ["#22c55e", "#ef4444"],
-        labels: ["Pass", "Fail"],
-        stroke: { width: 0 },
-        plotOptions: {
-            pie: {
-                donut: {
-                    size: "70%",
-                    labels: {
-                        show: true,
-                        name: { color: "#d1d5db" },
-                        value: { color: "#ffffff", fontSize: "22px", fontWeight: "700" },
-                        total: {
-                            show: true,
-                            label: "Total",
-                            color: "#9ca3af",
-                            formatter: (w) => w.globals.seriesTotals.reduce((a, b) => a + b, 0),
-                        },
-                    },
-                },
-            },
-        },
-        legend: {
-            position: "bottom",
-            labels: { colors: "#9ca3af" },
-        },
-        dataLabels: { enabled: false },
-    };
-}
+
 
 // ─── Dashboard Component ────────────────────────────────────
 export default function Dashboard() {
@@ -262,7 +206,7 @@ export default function Dashboard() {
     const [skills, setSkills] = useState(null);
     const [showAllSkills, setShowAllSkills] = useState(false);
     const [projectData, setProjectData] = useState(null);
-    const [piscineStats, setPiscineStats] = useState(null);
+
     const [isMobile, setIsMobile] = useState(false);
 
     // Track viewport for responsive chart heights
@@ -285,7 +229,7 @@ export default function Dashboard() {
                 setXpData(buildCumulativeXP(data.transaction));
                 setSkills(processSkills(data.skills));
                 setProjectData(buildXPByProject(data.xp_by_project));
-                setPiscineStats(buildPiscineStats(data.piscine_results));
+
             } catch (err) {
                 console.error("Failed to fetch dashboard data:", err);
             }
@@ -538,76 +482,7 @@ export default function Dashboard() {
                 )}
             </div>
 
-            {/* Piscine Stats — Pass/Fail Donut + Attempts Bar */}
-            {piscineStats && (
-                <div className="charts-grid">
-                    {/* Pass/Fail Donut */}
-                    <div className="chart-card">
-                        <h2 style={{ fontSize: "18px", marginBottom: "16px" }}>Piscine JS — Pass / Fail</h2>
-                        <ApexChart
-                            type="donut"
-                            height={isMobile ? 220 : 300}
-                            options={getPiscineDonutOptions()}
-                            series={[piscineStats.pass, piscineStats.fail]}
-                        />
-                    </div>
 
-                    {/* Attempts Per Exercise — Radar */}
-                    <div className="chart-card">
-                        <h2 style={{ fontSize: "18px", marginBottom: "16px" }}>Piscine JS — Attempts</h2>
-                        <ApexChart
-                            type="radar"
-                            height={isMobile ? 280 : 380}
-                            options={{
-                                chart: {
-                                    type: "radar",
-                                    background: "transparent",
-                                    toolbar: { show: false },
-                                    animations: { enabled: true, speed: 1500 },
-                                },
-                                theme: { mode: "dark" },
-                                colors: ["#a855f7"],
-                                stroke: { width: 2, colors: ["#a855f7"] },
-                                fill: {
-                                    opacity: 0.3,
-                                    colors: ["#a855f7"],
-                                },
-                                markers: {
-                                    size: 3,
-                                    colors: ["#a855f7"],
-                                    strokeColors: "#1f2937",
-                                    strokeWidth: 1,
-                                },
-                                xaxis: {
-                                    categories: Object.keys(piscineStats.attempts).slice(0, 15),
-                                    labels: {
-                                        style: {
-                                            colors: Array(15).fill("#9ca3af"),
-                                            fontSize: "10px",
-                                        },
-                                    },
-                                },
-                                yaxis: { show: false },
-                                plotOptions: {
-                                    radar: {
-                                        polygons: {
-                                            strokeColors: "#1f2937",
-                                            connectorColors: "#1f2937",
-                                            fill: { colors: ["transparent"] },
-                                        },
-                                    },
-                                },
-                                tooltip: { theme: "dark" },
-                                dataLabels: { enabled: false },
-                            }}
-                            series={[{
-                                name: "Attempts",
-                                data: Object.values(piscineStats.attempts).slice(0, 15),
-                            }]}
-                        />
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
