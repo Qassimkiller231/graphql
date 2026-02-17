@@ -1,7 +1,9 @@
 "use client";
 import { useAuthGuard } from "../hooks/useAuthGuard";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { graphqlRequest } from "../lib/graphClient";
+import { logoutUser } from "../services/authService";
 import { motion } from "framer-motion";
 import ApexChart from "@/components/ui/chart";
 import StatCard from "@/components/ui/StatCard";
@@ -298,46 +300,88 @@ export default function Dashboard() {
 
     return (
         <div className="dashboard-container">
-            {/* Header */}
-            <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, ease: "easeOut" }}
-                style={{ marginBottom: "28px", textAlign: isMobile ? "center" : "left" }}
-            >
-                <div style={{ display: "inline-block", verticalAlign: "middle", marginRight: "8px" }}>
-                    <LottieIcon
-                        url="https://fonts.gstatic.com/s/e/notoemoji/latest/1f44b/lottie.json"
-                        fallback="👋"
-                        size={36}
-                    />
-                </div>
-                <h1 style={{
-                    display: "inline",
-                    fontSize: "28px",
-                    fontWeight: "800",
-                    background: "linear-gradient(135deg, #a855f7, #ec4899)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                }}
+            {/* Header row — welcome + sign out */}
+            <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: isMobile ? "flex-start" : "center",
+                flexDirection: isMobile ? "column" : "row",
+                gap: isMobile ? "16px" : "0",
+                marginBottom: "28px",
+            }}>
+                <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, ease: "easeOut" }}
+                    style={{ textAlign: isMobile ? "center" : "left", width: isMobile ? "100%" : "auto" }}
                 >
-                    {userData ? `Welcome, ${userData.user[0].login}` : "Loading..."}
-                </h1>
-                {userData && (
-                    <motion.p
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.4 }}
-                        style={{
-                            color: "#6b7280",
-                            fontSize: "14px",
-                            marginTop: "6px",
-                        }}
-                    >
-                        Here&apos;s your progress overview
-                    </motion.p>
-                )}
-            </motion.div>
+                    <div style={{ display: "inline-block", verticalAlign: "middle", marginRight: "8px" }}>
+                        <LottieIcon
+                            url="https://fonts.gstatic.com/s/e/notoemoji/latest/1f44b/lottie.json"
+                            fallback="\u{1F44B}"
+                            size={36}
+                        />
+                    </div>
+                    <h1 style={{
+                        display: "inline",
+                        fontSize: "28px",
+                        fontWeight: "800",
+                        background: "linear-gradient(135deg, #a855f7, #ec4899)",
+                        WebkitBackgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                    }}>
+                        {userData ? `Welcome, ${userData.user[0].login}` : "Loading..."}
+                    </h1>
+                    {userData && (
+                        <motion.p
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.4 }}
+                            style={{
+                                color: "#6b7280",
+                                fontSize: "14px",
+                                marginTop: "6px",
+                            }}
+                        >
+                            Here&apos;s your progress overview
+                        </motion.p>
+                    )}
+                </motion.div>
+
+                {/* Sign Out Button */}
+                <motion.button
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.5, delay: 0.3 }}
+                    whileHover={{
+                        scale: 1.05,
+                        boxShadow: "0 0 20px rgba(239, 68, 68, 0.3)",
+                    }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                        logoutUser();
+                        window.location.href = "/";
+                    }}
+                    style={{
+                        padding: "10px 24px",
+                        borderRadius: "100px",
+                        background: "rgba(239, 68, 68, 0.1)",
+                        border: "1px solid rgba(239, 68, 68, 0.3)",
+                        color: "#f87171",
+                        fontSize: "14px",
+                        fontWeight: "600",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        transition: "all 0.3s ease",
+                        alignSelf: isMobile ? "center" : "flex-start",
+                    }}
+                >
+                    <span style={{ fontSize: "16px" }}>↪</span>
+                    Sign Out
+                </motion.button>
+            </div>
 
             {/* Stats — three cards */}
             {userData && (
