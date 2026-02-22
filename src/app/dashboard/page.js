@@ -21,14 +21,14 @@ const DASHBOARD_QUERY = `{
         login
         auditRatio
     }
-    transaction_aggregate(where: { type: { _eq: "xp" }, path: { _nlike: "%piscine%" } }) {
+    transaction_aggregate(where: { type: { _eq: "xp" }, _and: [{ path: { _like: "%bh-module%" } }, { path: { _nlike: "%/bh-module/%/%" } }] }) {
         aggregate {
             sum { amount }
             count
         }
     }
     transaction(
-        where: { type: { _eq: "xp" }, path: { _nlike: "%piscine%" } }
+        where: { type: { _eq: "xp" }, _and: [{ path: { _like: "%bh-module%" } }, { path: { _nlike: "%/bh-module/%/%" } }] }
         order_by: { createdAt: asc }
     ) {
         amount
@@ -36,25 +36,31 @@ const DASHBOARD_QUERY = `{
         path
     }
     skills: transaction(
-        where: { type: { _like: "skill_%" }, path: { _nlike: "%piscine%" } }
+        where: { type: { _like: "skill_%" }, _and: [{ path: { _like: "%bh-module%" } }, { path: { _nlike: "%/bh-module/%/%" } }] }
         order_by: [{ type: asc }, { amount: desc }]
         distinct_on: type
     ) {
         type
         amount
     }
-    pass: result_aggregate(where: { grade: { _gte: 1 }, path: { _nlike: "%piscine%" } }) {
+    pass: result_aggregate(where: { grade: { _gte: 1 }, _and: [{ path: { _like: "%bh-module%" } }, { path: { _nlike: "%/bh-module/%/%" } }, { path: { _nlike: "%checkpoint%" } }] }) {
         aggregate { count }
     }
-    fail: result_aggregate(where: { grade: { _lt: 1 }, path: { _nlike: "%piscine%" } }) {
+    fail: result_aggregate(where: { grade: { _lt: 1 }, _and: [{ path: { _like: "%bh-module%" } }, { path: { _nlike: "%/bh-module/%/%" } }, { path: { _nlike: "%checkpoint%" } }] }) {
         aggregate { count }
     }
     xp_by_project: transaction(
-        where: { type: { _eq: "xp" }, path: { _nlike: "%piscine%" } }
+        where: { type: { _eq: "xp" }, _and: [{ path: { _like: "%bh-module%" } }, { path: { _nlike: "%/bh-module/%/%" } }] }
         order_by: { amount: desc }
     ) {
         amount
         path
+    }
+    audit_up: transaction_aggregate(where: { type: { _eq: "up" } }) {
+        aggregate { sum { amount } }
+    }
+    audit_down: transaction_aggregate(where: { type: { _eq: "down" } }) {
+        aggregate { sum { amount } }
     }
 }`;
 
@@ -88,6 +94,8 @@ function buildXPByProject(transactions) {
         xp: t.amount,
     }));
 }
+
+
 
 
 
@@ -196,6 +204,111 @@ function getProjectChartOptions(projectNames) {
     };
 }
 
+// ─── Chart Configuration: Skills Radar ──────────────────────
+function getSkillsRadarOptions(skillNames) {
+    return {
+        chart: {
+            type: "radar",
+            background: "transparent",
+            toolbar: { show: false },
+            animations: { enabled: true, speed: 1500 },
+        },
+        theme: { mode: "dark" },
+        colors: ["#a855f7"],
+        stroke: { width: 2, colors: ["#a855f7"] },
+        fill: {
+            opacity: 0.3,
+            colors: ["#a855f7"],
+        },
+        markers: {
+            size: 3,
+            colors: ["#a855f7"],
+            strokeColors: "#1f2937",
+            strokeWidth: 1,
+        },
+        xaxis: {
+            categories: skillNames,
+            labels: {
+                style: {
+                    colors: Array(skillNames.length).fill("#d1d5db"),
+                    fontSize: "11px",
+                },
+            },
+        },
+        yaxis: { show: false },
+        plotOptions: {
+            radar: {
+                polygons: {
+                    strokeColors: "#1f2937",
+                    connectorColors: "#1f2937",
+                    fill: { colors: ["transparent"] },
+                },
+            },
+        },
+        tooltip: {
+            theme: "dark",
+            y: { formatter: (val) => `${val}%` },
+        },
+        dataLabels: { enabled: false },
+    };
+}
+
+// ─── Chart Configuration: Audit Given vs Received ───────────
+function getAuditChartOptions(given, received) {
+    return {
+        chart: {
+            type: "radialBar",
+            background: "transparent",
+            animations: { enabled: true, speed: 1500 },
+        },
+        theme: { mode: "dark" },
+        colors: ["#22c55e", "#f59e0b"],
+        plotOptions: {
+            radialBar: {
+                hollow: {
+                    size: "35%",
+                    background: "transparent",
+                },
+                track: {
+                    background: "rgba(255,255,255,0.05)",
+                    strokeWidth: "100%",
+                },
+                dataLabels: {
+                    name: {
+                        fontSize: "14px",
+                        color: "#9ca3af",
+                        offsetY: -10,
+                    },
+                    value: {
+                        fontSize: "20px",
+                        fontWeight: "700",
+                        color: "#ffffff",
+                        formatter: (val, opts) => {
+                            const idx = opts?.seriesIndex ?? 0;
+                            return formatXP(idx === 0 ? given : received);
+                        },
+                    },
+                    total: {
+                        show: true,
+                        label: "Ratio",
+                        color: "#9ca3af",
+                        formatter: () => (given / (received || 1)).toFixed(1),
+                    },
+                },
+            },
+        },
+        stroke: {
+            lineCap: "round",
+        },
+        labels: ["Given", "Received"],
+        legend: {
+            show: true,
+            position: "bottom",
+            labels: { colors: "#9ca3af" },
+        },
+    };
+}
+
 
 
 // ─── Dashboard Component ────────────────────────────────────
@@ -206,6 +319,7 @@ export default function Dashboard() {
     const [skills, setSkills] = useState(null);
     const [showAllSkills, setShowAllSkills] = useState(false);
     const [projectData, setProjectData] = useState(null);
+    const [auditData, setAuditData] = useState(null);
 
     const [isMobile, setIsMobile] = useState(false);
 
@@ -229,6 +343,10 @@ export default function Dashboard() {
                 setXpData(buildCumulativeXP(data.transaction));
                 setSkills(processSkills(data.skills));
                 setProjectData(buildXPByProject(data.xp_by_project));
+                setAuditData({
+                    given: data.audit_up.aggregate.sum.amount,
+                    received: data.audit_down.aggregate.sum.amount,
+                });
 
             } catch (err) {
                 console.error("Failed to fetch dashboard data:", err);
@@ -480,6 +598,42 @@ export default function Dashboard() {
                         />
                     </div>
                 )}
+            </div>
+
+            {/* Skills Radar + Audit Charts */}
+            <div className="charts-grid">
+                {/* Skills Radar */}
+                {skills && (
+                    <div className="chart-card">
+                        <h2 style={{ fontSize: "18px", marginBottom: "16px" }}>Skills Overview</h2>
+                        <ApexChart
+                            type="radar"
+                            height={isMobile ? 280 : 380}
+                            options={getSkillsRadarOptions(skills.map((s) => s.name))}
+                            series={[{
+                                name: "Skill Level",
+                                data: skills.map((s) => s.value),
+                            }]}
+                        />
+                    </div>
+                )}
+
+                {auditData && (() => {
+                    const total = auditData.given + auditData.received;
+                    const givenPct = Math.round((auditData.given / total) * 100);
+                    const receivedPct = Math.round((auditData.received / total) * 100);
+                    return (
+                        <div className="chart-card">
+                            <h2 style={{ fontSize: "18px", marginBottom: "16px" }}>Audit XP — Given vs Received</h2>
+                            <ApexChart
+                                type="radialBar"
+                                height={isMobile ? 300 : 380}
+                                options={getAuditChartOptions(auditData.given, auditData.received)}
+                                series={[givenPct, receivedPct]}
+                            />
+                        </div>
+                    );
+                })()}
             </div>
 
 
