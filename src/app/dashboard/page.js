@@ -255,6 +255,7 @@ function getSkillsRadarOptions(skillNames) {
 
 // ─── Chart Configuration: Audit Given vs Received ───────────
 function getAuditChartOptions(given, received) {
+    console.log(given, received)
     return {
         chart: {
             type: "radialBar",
@@ -283,9 +284,9 @@ function getAuditChartOptions(given, received) {
                         fontSize: "20px",
                         fontWeight: "700",
                         color: "#ffffff",
-                        formatter: (val, opts) => {
-                            const idx = opts?.seriesIndex ?? 0;
-                            return formatXP(idx === 0 ? given : received);
+                        formatter: (val) => {
+                            const total = given + received;
+                            return formatXP(Math.round((val / 100) * total));
                         },
                     },
                     total: {
