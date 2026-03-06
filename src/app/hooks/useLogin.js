@@ -32,8 +32,8 @@ export function useLogin() {
             // If we reach here, login succeeded → go to dashboard
             router.push("/dashboard");
         } catch (err) {
-            // If loginUser threw an error, show it to the user
-            setError(err.message);
+            // If loginUser threw an error, show a generic error to the user
+            setError("Invalid credentials");
         } finally {
             // Always stop the loading spinner, whether success or fail
             setLoading(false);
