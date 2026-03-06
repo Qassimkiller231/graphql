@@ -11,8 +11,8 @@ export function cn(...inputs) {
 function ceilTo3SF(n) {
     if (n === 0) return 0;
     const d = Math.floor(Math.log10(Math.abs(n))) - 2; // power for 3rd sig fig
-    const factor = Math.pow(10, d);
-    return Math.ceil(n / factor) * factor;
+    const factor = Math.pow(10, -d);
+    return Number((Math.ceil(n * factor) / factor).toPrecision(15));
 }
 
 /**
